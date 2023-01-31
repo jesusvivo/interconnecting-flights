@@ -1,5 +1,4 @@
-
-package com.jvc.interconnectingflights.webapp;
+package com.jvc.interconnectingflights.controller;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -9,33 +8,49 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
+import javax.validation.constraints.Size;
+
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import com.jvc.interconnectingflights.Flight;
-import com.jvc.interconnectingflights.Interconnection;
-import com.jvc.interconnectingflights.Route;
+import com.jvc.interconnectingflights.model.DailySchedule;
+import com.jvc.interconnectingflights.model.Flight;
+import com.jvc.interconnectingflights.model.Interconnection;
+import com.jvc.interconnectingflights.model.Leg;
+import com.jvc.interconnectingflights.model.MonthlySchedule;
+import com.jvc.interconnectingflights.model.Route;
+
+import reactor.core.publisher.Flux;
 
 @RestController
-public class Controller {
+public class InterconnectionsController {
 
     private final WebClient webClient;
-    private final Logger logger;
+    private Flux<Route> routesFlux;
 
-    public Controller() {
+    public InterconnectionsController() {
         this.webClient = WebClient.create("https://services-api.ryanair.com");
-        this.logger = LoggerFactory.getLogger(Controller.class);
     }
 
     @GetMapping("/interconnections")
-    public List<Interconnection> getInterconnections(@RequestParam String departure,
-            @RequestParam String arrival, @RequestParam String departureDateTime,
-            @RequestParam String arrivalDateTime) {
+    public List<Interconnection> getInterconnections(
+            @RequestParam @NotBlank @Size(min = 3, max = 3) @Pattern(regexp = "^[A-Z]+$") String departure,
+            @RequestParam @NotBlank @Size(min = 3, max = 3) @Pattern(regexp = "^[A-Z]+$") String arrival,
+            @RequestParam @NotBlank @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") String departureDateTime,
+            @RequestParam @NotBlank @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") String arrivalDateTime) {
+
         List<Interconnection> interconnections = new ArrayList<Interconnection>();
+
+        routesFlux = webClient.get()
+                .uri("/locate/3/routes")
+                .retrieve()
+                .bodyToFlux(Route.class)
+                .filter(route -> route.getConnectingAirport() == null && route.getOperator().equals("RYANAIR"));
 
         List<Route> directRoutes = getDirectRoutes(departure, arrival);
 
@@ -49,12 +64,8 @@ public class Controller {
     }
 
     List<Route> getDirectRoutes(String departure, String arrival) {
-        return webClient.get()
-                .uri("/locate/3/routes")
-                .retrieve()
-                .bodyToFlux(Route.class)
-                .filter(route -> route.getConnectingAirport() == null && route.getOperator().equals("RYANAIR") &&
-                        route.getAirportFrom().equals(departure) && route.getAirportTo().equals(arrival))
+        return routesFlux
+                .filter(route -> route.getAirportFrom().equals(departure) && route.getAirportTo().equals(arrival))
                 .collectList()
                 .block();
     }
@@ -111,13 +122,7 @@ public class Controller {
     List<Route> getIndirectRoutes(String departure, String arrival) {
         Map<String, List<String>> graph = new HashMap<>();
 
-        List<Route> allRoutes = webClient.get()
-                .uri("/locate/3/routes")
-                .retrieve()
-                .bodyToFlux(Route.class)
-                .filter(route -> route.getConnectingAirport() == null && route.getOperator().equals("RYANAIR"))
-                .collectList()
-                .block();
+        List<Route> allRoutes = routesFlux.collectList().block();
 
         for (Route route : allRoutes) {
             String airportFrom = route.getAirportFrom();

@@ -1,4 +1,4 @@
-package com.jvc.interconnectingflights.webapp;
+package com.jvc.interconnectingflights.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,8 +1,6 @@
-package com.jvc.interconnectingflights;
+package com.jvc.interconnectingflights.model;
 
 import java.util.List;
-
-import com.jvc.interconnectingflights.webapp.Leg;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

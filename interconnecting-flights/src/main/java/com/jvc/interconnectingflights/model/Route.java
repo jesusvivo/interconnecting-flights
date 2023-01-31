@@ -1,4 +1,4 @@
-package com.jvc.interconnectingflights;
+package com.jvc.interconnectingflights.model;
 
 import lombok.Data;
 
