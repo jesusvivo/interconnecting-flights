@@ -10,5 +10,4 @@ public class InterconnectingFlightsApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(InterconnectingFlightsApplication.class, args);
 	}
-
 }
